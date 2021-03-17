@@ -1,4 +1,4 @@
-# analytics-indexer
+# Metrics Indexer
 
 Analytics indexer with Postgres using Python
 
