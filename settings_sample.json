@@ -1,0 +1,13 @@
+  
+{
+    "appName":"analytics-dashboard",
+    "baseUrl":"https://api.algoexplorer.io/v1",
+    "urlSlack":"https://hooks.slack.com/services/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" ,
+    "database":{
+        "user":"user",
+        "password":"password",
+        "host": "localhost",
+        "port": 0000,
+        "databaseName":"databaseName"
+    }
+}
