@@ -2,7 +2,7 @@
 {
     "appName":"analytics-dashboard",
     "baseUrl":"https://api.algoexplorer.io/v1",
-    "urlSlack":"https://hooks.slack.com/services/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" ,
+    "urlSlack":"slack.com" ,
     "database":{
         "user":"user",
         "password":"password",
