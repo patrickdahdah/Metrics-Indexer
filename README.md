@@ -1,6 +1,8 @@
 # analytics-indexer
 
-Analytics indexer to MySQL using Python
+Analytics indexer with Postgres using Python
+
+Data folder is not included (Confidential)
 
 ## Dependencies
 
@@ -15,8 +17,8 @@ pip install sqlalchemy pandas requests cryptography psycopg2
 specify the settings path
 
 example:
-```bash
-main.py -s C:\\Users\\...\\settings.json
+```
+python main.py -s C:\\Users\\...\\settings.json
 ```
 
-### MySql disable strict mode run the below sql
+
