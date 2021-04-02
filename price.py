@@ -1,14 +1,16 @@
-from lib.configs import settings, transaction_metrics_table_name, balances_metrics_table_name
+from lib.configs import settings, price_table_name
 from database import insert
+from network import interface
 import signal #library to be able to quit the program with CTRL + C
 import time
 from sqlalchemy.exc import SQLAlchemyError
 import requests
 import logging
+import pandas as pd
 
 logging.Formatter.converter = time.gmtime
 logger = logging.getLogger(__name__)
-f_handler = logging.FileHandler('file.log')
+f_handler = logging.FileHandler('pricelog.log')
 f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 f_handler.setFormatter(f_format)
 logger.addHandler(f_handler)
@@ -29,10 +31,9 @@ signal.signal(signal.SIGILL, receiveSignal)
 
 while shouldNotQuit: #True unless CTRL + C is invoked.
     try:
-        insert.sql.startSQL() #creates engine variable | creates the tables if they dont exists.
-        last_timestamp = insert.sql.getLastTimestamp(balances_metrics_table_name)
-
-        sinceDate =  int( (last_timestamp + 3600) / 3600) * 3600
+        # insert.sql.startPriceSQL() #creates engine variable | creates the tables if they dont exists.
+        #last_timestamp = insert.sql.getLastTimestamp(price_table_name)
+        last_timestamp = 1567296000
         print("START")
 
         while shouldNotQuit:
@@ -41,40 +42,29 @@ while shouldNotQuit: #True unless CTRL + C is invoked.
                 print("\n******** New loop *******")
                 s = time.time()
 
-                                #----------Query Indicators  --------------------
+                                #----------Query Price Rows --------------------
+                print(last_timestamp)
+                priceData = interface.getPriceRows(last_timestamp)
 
-                result = insert.insertIndicators(sinceDate)
-                
-                if result["status"]==200:
-                    if result["type"]=="keepUpdating":
-                        sinceDate += 3600
-                        sleepIndicators=False #table NOT updated | succesfull insert 
-                        e = time.time()
-                        print("TIME indicators: " + str(e-s))
+                if priceData != None:
+                    sleepIndicators = False
+                    price_rows = pd.json_normalize(priceData).set_index("timestamp")
+                    price_rows['pair'] = "algo-usd"
+                    last_timestamp = price_rows.index.max()
+                    # print(last_timestamp)
+                    # exit()
 
-                    elif result["type"]=="transaction_not_updated":
-                        print("Transaction table or Special Addresses table is not up to date")
-                        e = time.time()
-                        print("TIME indicators: " + str(e-s))
-                        sleepIndicators=True 
-                        
-                    elif result["type"]=="updated":
-                        print("Indicators updated")
-                        e = time.time()
-                        print("TIME indicators: " + str(e-s))
-                        sleepIndicators=True 
                 else:
-                    print(result)
-                    raise result
+                    sleepIndicators = True
                 
                 #----------data updated sleep-----------
                 #if sleepCS and sleepPrice and sleepIndicators: #if the three tables are updated sleep for 60seconds
                 if sleepIndicators: #if the three tables are updated sleep for 60seconds
-                    print(f"30s sleep:" + str({result["type"]}))
+                    print(f"30s sleep:" + str(last_timestamp))
                     time.sleep(30)
                 
             except requests.exceptions.RequestException as err:
-                logger.warning("lasttimestamp: " + str(last_timestamp) + " SinceTime: " + str(sinceDate)+ " error: " + str(err))
+                logger.warning("lasttimestamp: " + str(last_timestamp) + " SinceTime: " + str(sinceDate)+ "error: " + str(err))
                 print("HTTP requests error\n",err,"\n!15s sleep")
                 time.sleep(15) 
 
@@ -89,7 +79,7 @@ while shouldNotQuit: #True unless CTRL + C is invoked.
 
            
     except TimeoutError as err:
-        logger.warning("lasttimestamp: " + str(last_timestamp) + " SinceTime: " + str(sinceDate) + " error: " + str(err))
+        logger.warning("lasttimestamp: " + str(last_timestamp) + " SinceTime: " + str(sinceDate) + "error: " + str(err))
 
         print("TimeoutError error\n",err,"\n!30s sleep")
         time.sleep(30) 

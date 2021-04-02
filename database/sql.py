@@ -1,22 +1,23 @@
-from os.path import split
-from lib.configs import settings, addrList, dfGenesis,dfAddresses, dfExchanges , balances_table_name, economics_table_name, balances_metrics_table_name, transaction_metrics_table_name,exceptional_addresses_table_name, exchanges_table_name
+from lib.configs import settings, addrList, dfGenesis, dfAddresses, \
+dfExchanges, balances_table_name, economics_table_name, balances_metrics_table_name, \
+transaction_metrics_table_name, exceptional_addresses_table_name, exchanges_table_name, price_table_name, misc_metrics_table_name, assets_metrics_table_name
 # from sqlalchemy import create_engine
 import sqlalchemy
 from lib.configs import settings
 from network import interface
 import pandas as pd
 
+
 def startSQL():
     global engine
 
     engine = sqlalchemy.create_engine("postgres+psycopg2://{user}:{pw}@{host}:{port}/{db}"
-                           .format(user=settings["database"]["user"],
-                                   pw=settings["database"]["password"],
-                                   db=settings["database"]["databaseName"],
-                                   host=settings["database"]["host"],
-                                   port=settings["database"]["port"]
-                                   ))
-
+                                      .format(user=settings["database"]["user"],
+                                              pw=settings["database"]["password"],
+                                              db=settings["database"]["databaseName"],
+                                              host=settings["database"]["host"],
+                                              port=settings["database"]["port"]
+                                              ))
 
     # dropAllTables(engine)
 
@@ -24,35 +25,40 @@ def startSQL():
     createTableExceptionalAddresses(engine, exceptional_addresses_table_name)
     createEconomicsTable(engine, economics_table_name)
     createBalancesMetricsTable(engine, balances_metrics_table_name)
-    createTransactionMetricsTable(engine, transaction_metrics_table_name)
-    
+    createMiscTable(engine, misc_metrics_table_name)
+    createAssetsMetricsTable(engine, assets_metrics_table_name)
+
 
 def dropAllTables(engine):
     connection = engine.connect()
-    connection.execute("""DROP TABLE IF EXISTS {balances_table_name}, {economics_table_name}, {balances_metrics_table_name}, {transaction_metrics_table_name};
-    """.format(balances_table_name=balances_table_name, economics_table_name = economics_table_name, balances_metrics_table_name = balances_metrics_table_name, transaction_metrics_table_name = transaction_metrics_table_name ))
+    connection.execute("""DROP TABLE IF EXISTS {balances_table_name}, {economics_table_name}, {balances_metrics_table_name}, 
+    {transaction_metrics_table_name}, {exceptional_addresses_table_name}, {exchanges_table_name}, {misc_metrics_table_name}, {assets_metrics_table_name} ;
+    """.format(balances_table_name=balances_table_name, economics_table_name=economics_table_name,
+               balances_metrics_table_name=balances_metrics_table_name, transaction_metrics_table_name=transaction_metrics_table_name,
+               exceptional_addresses_table_name=exceptional_addresses_table_name, exchanges_table_name=exchanges_table_name,
+               misc_metrics_table_name = misc_metrics_table_name, assets_metrics_table_name = assets_metrics_table_name))
 
-    connection.close() 
+    connection.close()
 
 
 def startEngineSQL():
     global engine
 
     engine = sqlalchemy.create_engine("postgres+psycopg2://{user}:{pw}@{host}:{port}/{db}"
-                           .format(user=settings["database"]["user"],
-                                   pw=settings["database"]["password"],
-                                   db=settings["database"]["databaseName"],
-                                   host=settings["database"]["host"],
-                                   port=settings["database"]["port"]
-                                   )) 
-
+                                      .format(user=settings["database"]["user"],
+                                              pw=settings["database"]["password"],
+                                              db=settings["database"]["databaseName"],
+                                              host=settings["database"]["host"],
+                                              port=settings["database"]["port"]
+                                              ))
+    dropAllTables(engine)
 
 
 def createTableBalances(engine, balances_table_name):
     connection = engine.connect()
     connection.execute("""CREATE TABLE IF NOT EXISTS {balances_table_name}(
                                 address VARCHAR NOT NULL PRIMARY KEY,
-                                index bigint NOT NULL,
+                                "index" bigint NOT NULL,
                                 "timestamp" bigint NOT NULL,
                                 txid VARCHAR NOT NULL,
                                 balance numeric(24,0) NOT NULL,
@@ -60,8 +66,7 @@ def createTableBalances(engine, balances_table_name):
                                 realized_cap numeric(28,4) NOT NULL
                                 );
 
-                                CREATE INDEX IF NOT EXISTS balance_index_stats_balances ON {balances_table_name} ("balance");
-                                CREATE INDEX IF NOT EXISTS balance_index_stats_timestamp ON {balances_table_name} ("timestamp");""".format(balances_table_name=balances_table_name))
+                                CREATE INDEX IF NOT EXISTS balance_index_stats_balances ON {balances_table_name} ("balance");""".format(balances_table_name=balances_table_name))
 
     result = connection.execute("""SELECT CASE WHEN EXISTS(SELECT 1 FROM {balances_table_name}) THEN 0 ELSE 1 END AS IsEmpty;""".format(
         balances_table_name=balances_table_name))  # get max(last) timestamp of existing tables
@@ -90,7 +95,8 @@ def createTableExceptionalAddresses(engine, exceptional_addresses_table_name):
 
     if isEmpty == 1:  # If table is empty, insert the genesis allocations
         dfAddresses.to_sql(exceptional_addresses_table_name, con=engine,
-                         index=False, if_exists='append', chunksize=1000)
+                           index=False, if_exists='append', chunksize=1000)
+
 
 def createTableExchanges(engine, exchanges_table_name):
     connection = engine.connect()
@@ -108,7 +114,7 @@ def createTableExchanges(engine, exchanges_table_name):
 
     if isEmpty == 1:  # If table is empty, insert the genesis allocations
         dfExchanges.to_sql(exchanges_table_name, con=engine,
-                         index=False, if_exists='replace', chunksize=1000)
+                           index=False, if_exists='replace', chunksize=1000)
 
 
 def createBalancesMetricsTable(engine, table_name):
@@ -125,7 +131,7 @@ def createBalancesMetricsTable(engine, table_name):
                                 "average_balance" numeric NOT NULL
                                 );
 
-                                CREATE INDEX IF NOT EXISTS timestamp_index_stats_balances_metrics ON {table_name} ("timestamp");""".format(table_name=table_name))
+                                """.format(table_name=table_name))
 
     connection.close()
 
@@ -146,7 +152,7 @@ def createTransactionMetricsTable(engine, table_name):
                                 "count_asa" bigint
                                 );
 
-                                CREATE INDEX IF NOT EXISTS timestamp_index_stats_transaction_metrics ON {table_name} ("timestamp");""".format(table_name=table_name))
+                                """.format(table_name=table_name))
 
     connection.close()
 
@@ -155,7 +161,7 @@ def createEconomicsTable(engine, table_name):
     connection = engine.connect()
     connection.execute("""CREATE TABLE IF NOT EXISTS {table_name} (
 			                    timestamp bigint NOT NULL PRIMARY KEY,
-                                circulating_supply numeric NOT NULL,
+                                tradeable_supply numeric NOT NULL,
                                 realized_cap numeric NOT NULL,
                                 market_cap numeric NOT NULL,	
                                 mvrv_ratio numeric,
@@ -170,64 +176,167 @@ def createEconomicsTable(engine, table_name):
 
     connection.close()
 
+def createMiscTable(engine, table_name): #stats_metrics_misc 
+    connection = engine.connect()
+    connection.execute("""CREATE TABLE IF NOT EXISTS {table_name} (
+			                    timestamp bigint NOT NULL PRIMARY KEY,
+                                tph integer NOT NULL
+                                );  """.format(table_name=table_name))
+
+    connection.close()
+
+def createAssetsMetricsTable(engine, table_name): #stats_metrics_misc 
+    connection = engine.connect()
+    connection.execute("""CREATE TABLE IF NOT EXISTS {table_name} (
+			                    asset_id integer NOT NULL,
+                                timestamp bigint NOT NULL,
+								"count" integer NOT NULL,
+								volume numeric(36,0),
+								PRIMARY KEY(asset_id, timestamp)
+                                );   """.format(table_name=table_name))
+
+    connection.close()
+
 
 # get transaction table: since (use txIndex) | until (use day time Y-m-d)|
 def AlgoTransactionsToBalances(sinceDate, untilDate, price, balances_table_name):
     with engine.begin() as connection:  # open a transaction - this runs in the
-            connection.execute("""INSERT INTO {balances_table_name} SELECT * FROM 
-                                            (SELECT Distinct ON (address) address , "index", timestamp, txid, balance, {price} AS price, balance * {price} AS realized_cap 
-                                            FROM (SELECT "index", "timestamp", txid, sender as address, sender_balance AS balance
-                                                FROM "transaction"
-                                                            WHERE timestamp BETWEEN {sinceDate} AND {untilDate}-1 AND "type" = 'pay'
-                                                
+        connection.execute("""with transactions_in_between as (                                
+                            SELECT tra."index", tra."timestamp", tra.txid,
+                            s.address AS "sender", tra.sender_balance,
+                            r.address AS "receiver", tra.receiver_balance,
+                            c.address AS "close", tra.close_balance
 
-                                                            UNION ALL
-
-                                                            SELECT "index", "timestamp", txid, receiver AS address, receiver_balance AS balance
-                                                            FROM "transaction"
-                                                            WHERE timestamp BETWEEN {sinceDate} AND {untilDate}-1 AND "type" = 'pay'
-                                                            UNION ALL
-
-                                                            SELECT "index", "timestamp", txid, "close" AS address, close_balance AS balance
-                                                            FROM "transaction"
-                                                            WHERE timestamp BETWEEN {sinceDate} AND {untilDate}-1 AND "type" = 'pay' AND "close" IS NOT NULL) AS tabla
-                                                ORDER BY address,"index" DESC) AS S
-                                            ON CONFLICT (address) DO UPDATE SET
-                                                    "index" = excluded.index,
-                                                    timestamp = excluded.timestamp,
-                                                    txid = excluded.txid,
-                                                    balance = excluded.balance,
-                                                    price = excluded.price,
-                                                    realized_cap = excluded.realized_Cap;
-                                                    
-                            WITH special_addresses AS (select * from (SELECT '737777777777777777777777777777777777777777777777777UFEJ2CI' as address, timestamp, rewards_pool_balance as balance
-                                    FROM special_balances
-                                    Where timestamp < {untilDate}
-                                    ORDER BY timestamp DESC LIMIT 1) as rewards
-
-                            UNION ALL
-
-                            select * from (SELECT 'Y76M3MSY6DKBRHBL7C3NNDXGS5IIMQVQVUAB6MP4XEMMGVF2QWNPL226CA' as address, timestamp, fee_sink_balance as balance
-                                    FROM special_balances
-                                    Where timestamp < {untilDate}
-                                    ORDER BY timestamp DESC LIMIT 1) as fees)
+                            FROM transaction tra
+                            INNER JOIN account s ON s.index = tra.sender_address_index
+                            LEFT  JOIN account r ON r.index = tra.receiver_address_index
+                            LEFT  JOIN account c ON c.index = tra.close_address_index
+                            WHERE timestamp BETWEEN {sinceDate} AND {untilDate}-1 AND "type" = 'pay'
+                            LIMIT 10)
 
 
-                            UPDATE {balances_table_name}
-                            SET   	
-                                    timestamp = special_addresses.timestamp,
-                                    txid = 'special_address',	
-                                    balance = special_addresses.balance,
-                                    price = {price},
-                                    realized_cap = special_addresses.balance * {price}
+                            INSERT INTO {balances_table_name} SELECT * FROM 
+                                                                        (SELECT Distinct ON (address) address , "index", timestamp, txid, balance, {price} AS price, balance * {price} AS realized_cap 
+                                                                        FROM (SELECT "index", "timestamp", txid, sender as address, sender_balance AS balance
+                                                                            FROM "transactions_in_between"
+                                                                            
+
+                                                                                        UNION ALL
+
+                                                                                        SELECT "index", "timestamp", txid, receiver AS address, receiver_balance AS balance
+                                                                                        FROM "transactions_in_between"
+                                                                            
+                                                                                        UNION ALL
+
+                                                                                        SELECT "index", "timestamp", txid, "close" AS address, close_balance AS balance
+                                                                                        FROM "transactions_in_between" WHERE "close" IS NOT NULL) AS tabla
+                                                                            ORDER BY address,"index" DESC) AS S
+                                                                        ON CONFLICT (address) DO UPDATE SET
+                                                                                "index" = excluded.index,
+                                                                                timestamp = excluded.timestamp,
+                                                                                txid = excluded.txid,
+                                                                                balance = excluded.balance,
+                                                                                price = excluded.price,
+                                                                                realized_cap = excluded.realized_Cap;
+                                                                                
+                                                        WITH special_addresses AS ( 
+                                                            select * from (SELECT '737777777777777777777777777777777777777777777777777UFEJ2CI' as address, timestamp, rewards_pool_balance as balance
+                                                                FROM special_balances
+                                                                Where timestamp < {untilDate}
+                                                                ORDER BY timestamp DESC LIMIT 1) as rewards
+
+                                                        UNION ALL
+
+                                                            select * from (SELECT 'Y76M3MSY6DKBRHBL7C3NNDXGS5IIMQVQVUAB6MP4XEMMGVF2QWNPL226CA' as address, timestamp, fee_sink_balance as balance
+                                                                FROM special_balances
+                                                                Where timestamp < {untilDate}
+                                                                ORDER BY timestamp DESC LIMIT 1) as fees  )
 
 
-                            FROM   special_addresses
-                            WHERE {balances_table_name}.address = special_addresses.address;
-                                                    
+                                                        UPDATE {balances_table_name}
+                                                        SET   	
+                                                                timestamp = special_addresses.timestamp,
+                                                                txid = 'special_address',	
+                                                                balance = special_addresses.balance,
+                                                                price = {price},
+                                                                realized_cap = special_addresses.balance * {price}
+
+
+                                                        FROM   special_addresses
+                                                        WHERE {balances_table_name}.address = special_addresses.address;
+                                                                                
                                                     
                                                     """.format(sinceDate=sinceDate, untilDate=untilDate, price=price, balances_table_name=balances_table_name))
 
+
+def queryAlgoTransactionsToBalances(sinceDate, untilDate, price, balances_table_name):
+    query = """WITH transactions_in_between AS (                                
+                            SELECT tra."index", tra."timestamp", tra.txid,
+                            s.address AS "sender", tra.sender_balance,
+                            r.address AS "receiver", tra.receiver_balance,
+                            c.address AS "close", tra.close_balance
+
+                            FROM transaction tra
+                            INNER JOIN account s ON s.index = tra.sender_address_index
+                            LEFT  JOIN account r ON r.index = tra.receiver_address_index
+                            LEFT  JOIN account c ON c.index = tra.close_address_index
+                            WHERE timestamp BETWEEN {sinceDate} AND {untilDate}-1 AND "type" = 'pay')
+
+
+                            INSERT INTO {balances_table_name} SELECT * FROM 
+                                                                        (SELECT Distinct ON (address) address , "index", timestamp, txid, balance, {price} AS price, balance * {price} AS realized_cap 
+                                                                        FROM (SELECT "index", "timestamp", txid, sender as address, sender_balance AS balance
+                                                                            FROM "transactions_in_between"
+                                                                            
+
+                                                                                        UNION ALL
+
+                                                                                        SELECT "index", "timestamp", txid, receiver AS address, receiver_balance AS balance
+                                                                                        FROM "transactions_in_between"
+                                                                            
+                                                                                        UNION ALL
+
+                                                                                        SELECT "index", "timestamp", txid, "close" AS address, close_balance AS balance
+                                                                                        FROM "transactions_in_between" WHERE "close" IS NOT NULL) AS tabla
+                                                                            ORDER BY address,"index" DESC) AS S
+                                                                        ON CONFLICT (address) DO UPDATE SET
+                                                                                "index" = excluded.index,
+                                                                                timestamp = excluded.timestamp,
+                                                                                txid = excluded.txid,
+                                                                                balance = excluded.balance,
+                                                                                price = excluded.price,
+                                                                                realized_cap = excluded.realized_Cap;
+                                                                                
+                                                        WITH special_addresses AS ( 
+                                                            select * from (SELECT '737777777777777777777777777777777777777777777777777UFEJ2CI' as address, timestamp, rewardspool_balance as balance
+                                                                FROM "block"
+                                                                Where timestamp < {untilDate}
+                                                                ORDER BY timestamp DESC LIMIT 1) as rewards
+
+                                                        UNION ALL
+
+                                                            select * from (SELECT 'Y76M3MSY6DKBRHBL7C3NNDXGS5IIMQVQVUAB6MP4XEMMGVF2QWNPL226CA' as address, timestamp, feesink_balance as balance
+                                                                FROM "block"
+                                                                Where timestamp < {untilDate}
+                                                                ORDER BY timestamp DESC LIMIT 1) as fees  )
+
+
+                                                        UPDATE {balances_table_name}
+                                                        SET   	
+                                                                timestamp = special_addresses.timestamp,
+                                                                txid = 'special_address',	
+                                                                balance = special_addresses.balance,
+                                                                price = {price},
+                                                                realized_cap = special_addresses.balance * {price}
+
+
+                                                        FROM   special_addresses
+                                                        WHERE {balances_table_name}.address = special_addresses.address;
+                                                                                
+                                                    
+                                                    """.format(sinceDate=sinceDate, untilDate=untilDate, price=price, balances_table_name=balances_table_name)
+
+    return query
 
 
 def queryInsertBalancesMetrics(timestamp):
@@ -282,7 +391,7 @@ def queryInsertTransactionMetrics(sinceDate, untilDate):
                                                 (
                                                 SELECT {untilDate} as timestamp , COUNT("index") AS "count_asa"
                                                 FROM "transaction"
-                                                WHERE "timestamp" BETWEEN {sinceDate} AND {untilDate}-1 AND "asset_id" != 0
+                                                WHERE "timestamp" BETWEEN {sinceDate} AND {untilDate}-1 AND "asset_id" != -1
                                                 ) AS ASA  ON USDC.timestamp = ASA.timestamp 
                                         ) AS transaction_metrics
 
@@ -292,22 +401,50 @@ def queryInsertTransactionMetrics(sinceDate, untilDate):
 
 
 def queryInsertEconomicsMetrics(economicsColumns, economicsValues):
-    query = """INSERT INTO {tn} {columns} VALUES {values}
-                    ON CONFLICT ("timestamp")
-                    DO NOTHING;""".format(tn=economics_table_name, columns = economicsColumns, values=economicsValues)
+    query = "INSERT INTO {tn} {columns} VALUES {values} \
+                    ON CONFLICT (timestamp) \
+                    DO NOTHING;".format(tn=economics_table_name, columns=economicsColumns, values=economicsValues)
 
     return query
 
 
-def insertTransactionsAndBalancesMetrics( sinceDate, untilDate):
+def queryInsertMiscMetrics(sinceDate, untilDate):
+
+    query = """INSERT INTO {table_name} SELECT * FROM (
+						SELECT {untilDate} as timestamp , COUNT("index") AS "tph"
+						FROM "transaction"
+						WHERE "timestamp" BETWEEN {sinceDate} AND {untilDate}-1
+                                        ) AS transaction_metrics
+                    ON CONFLICT ("timestamp")
+                    DO NOTHING;""".format(table_name=misc_metrics_table_name, sinceDate=sinceDate, untilDate=untilDate)
+
+    return query
+
+
+def queryInsertAssetMetrics(sinceDate, untilDate):
+    query = """INSERT INTO {table_name} SELECT * FROM ( 
+					SELECT asset_id , {untilDate} as timestamp , COUNT("index") AS "count", ROUND((SUM(amount) + SUM(close_amount)), 2) AS "volume"
+					FROM "transaction"
+					WHERE "timestamp" BETWEEN {sinceDate} AND {untilDate}-1
+					GROUP BY asset_id
+                                        ) AS transaction_metrics
+                    ON CONFLICT ("asset_id", "timestamp")
+                    DO NOTHING;""".format(table_name=assets_metrics_table_name, sinceDate=sinceDate, untilDate=untilDate)
+
+    return query
+
+
+def insertTransactionsAndBalancesMetrics(sinceDate, untilDate):
     with engine.begin() as connection:  # open a transaction - this runs in the
-        connection.execute(queryInsertBalancesMetrics( untilDate))
+        connection.execute(queryInsertBalancesMetrics(untilDate))
         connection.execute(queryInsertTransactionMetrics(sinceDate, untilDate))
 
 
-def insertEconomics( economicsColumns , economicsValues):
+def insertEconomics(economicsValues):
     with engine.begin() as connection:  # open a transaction - this runs in the
-        connection.execute(queryInsertEconomicsMetrics(economicsColumns , economicsValues))
+        connection.execute("INSERT INTO {tb} VALUES (?) \
+                    ON CONFLICT (timestamp) \
+                    DO NOTHING;".format(tb=economics_table_name),  [','.join(economicsValues)])
 
 
 def getLastTimestamp(tableName):
@@ -318,8 +455,12 @@ def getLastTimestamp(tableName):
 
     connection.close()
 
-    if timestamp == 1560211200: 
+    if timestamp == 1560211200:
         return 1560556799
+    elif timestamp == None and tableName == balances_metrics_table_name:
+        return 1560556799
+    elif timestamp == None and tableName == price_table_name:
+        return 1567296000
     else:
         return timestamp
 
@@ -337,9 +478,9 @@ def getLastIndex(tableName):
         return lastIndex
 
 
-def insert_df(dataFrame, tableName):
+def insert_df(dataFrame, tableName, connection):
     # INSERT pandas dataframe. if it exists append the rows to the existing table
-    dataFrame.to_sql(tableName, con=engine, if_exists='append')
+    dataFrame.to_sql(tableName, con=connection, if_exists='append')
 
 
 def insert_df_replace(dataFrame, tableName):
@@ -361,14 +502,13 @@ def getAlgoTransactions(sinceIndex, untilDate):
                                             "amount"/1000000 AS "amount",
                                              "close","close_balance"/1000000 as "close_balance", "close_index", "close_amount"/1000000 AS "close_amount"
                                         FROM "{db}"."transactions"
-                                        WHERE "index" > {since} AND "timestamp" < '{date}' AND "asset_id"= 0 AND ("amount"!=0 OR ( "amount"= 0 AND "close_amount" > 0))
+                                        WHERE "index" > {since} AND "timestamp" < '{date}' AND "asset_id"= -1 AND ("amount"!=0 OR ( "amount"= 0 AND "close_amount" > 0))
                                         #LIMIT 11000;
                                         """.format(since=sinceIndex, date=str(untilDate), db=settings["database"]["databaseName"]), connection)
 
     connection.close()
 
     return result
-
 
 
 def getTransactionsExchanges(lastCheckedIndex, amount):
@@ -388,49 +528,53 @@ def getTransactionsExchanges(lastCheckedIndex, amount):
                                     LEFT JOIN stats_exchanges_addresses ON (trans.receiver = stats_exchanges_addresses.address)
                                     WHERE stats_exchanges_addresses.address IS NOT NULL;
 
-                                """.format(index=lastCheckedIndex, amount = amount*1000000), connection)
+                                """.format(index=lastCheckedIndex, amount=amount*1000000), connection)
     connection.close()
     return result
 
 
 # get standar deviation of market cap for the MRVR ZERO Calculation
-def getSTDDevMarketCap(tableName):
-    connection = engine.connect()
+def getSTDDevMarketCap(tableName,connection):
+
     result = connection.execute("""SELECT  stddev("market_cap"), count("market_cap") FROM {tn}""".format(
         tn=tableName))
     row = result.first()
-    connection.close()
+
     # if result == None or marketCap days less than 4 rows or std == 0: return None
     if not row or (row[1] < 3):
         return 0
     return float(row[0])
 
 
+def getTradeableAndRealizedCap(tableName, connection):
 
-def getCirculatingAndRealizedCap(tableName): 
-    connection = engine.connect()
-    result =connection.execute("""
-                                    SELECT * FROM( 
-                                        select 1 as "nothing",
-                                        (SELECT 10000000000 - ROUND((SUM("balance"))/1000000, 2) 
+    result = connection.execute("""
+                            SELECT * FROM( 
+                                select 1 as "nothing",
+                                (SELECT 10000000000 - ROUND((SUM("balance"))/1000000, 2) 
+                                FROM {balances_table}
+                                WHERE EXISTS(
+                                    SELECT 1 FROM {exceptionalAdresses_table} WHERE {balances_table}.address = {exceptionalAdresses_table}.address)) AS tradeable ,
+                                
+                                (	SELECT ROUND((
+                                    (SELECT ROUND((SUM("realized_cap"))/1000000 , 2) 
+                                        FROM {balances_table}))
+
+                                        - (SELECT SUM("realized_cap")
                                         FROM {balances_table}
                                         WHERE EXISTS(
-                                            SELECT 1 FROM {exceptionalAdresses_table} WHERE {balances_table}.address = {exceptionalAdresses_table}.address)) AS circulating ,
+                                            SELECT 1 FROM {exceptionalAdresses_table} WHERE {balances_table}.address = {exceptionalAdresses_table}.address)) /1000000 , 2)
+                                )  AS realized
 
-                                        (SELECT ROUND((SUM("realized_cap"))/1000000 , 2) as "circulating_realized"
-                                        FROM {balances_table}
-                                        WHERE NOT EXISTS(
-                                            SELECT 1 FROM {exceptionalAdresses_table} WHERE {balances_table}.address = {exceptionalAdresses_table}.address))  AS realized
+                            ) as " AS tradeable_realized"; """.format(balances_table=tableName, exceptionalAdresses_table=exceptional_addresses_table_name))
 
-                                    ) as " AS circulating_realized"; """.format(balances_table=tableName, exceptionalAdresses_table=exceptional_addresses_table_name))
-    connection.close()
 
     row = result.first()
 
     if row:
-        return float(row[1]), float(row[2])#float(row[0])
+        return float(row[1]), float(row[2])  # float(row[0])
     else:
-        print("** CIRCULATING SUPPLY AND realizedCap QUERY IS NULL ! **")
+        print("** TRADEABLE SUPPLY AND realizedCap QUERY IS NULL ! **")
 
 
 def getCirculating(tableName):
@@ -447,14 +591,75 @@ def getCirculating(tableName):
         print("** CIRCULATING SUPPLY AND realizedCap QUERY IS NULL ! **")
 
 
-def getVolumeAlgo(timestamp):
+def getVolumeAlgo(timestamp, connection):
+
+    result = connection.execute("""SELECT "volume" FROM  {tn} WHERE asset_id = -1 and "timestamp" = {timestamp};""".format(
+        tn=assets_metrics_table_name, timestamp=timestamp))  # get volume based on timestamp
+
+    volume_algo = result.first()
+    
+
+    if volume_algo == None:
+        return 0
+    else:
+        if volume_algo[0]:
+            return float(volume_algo[0])
+        else:
+            return 0
+
+def get24hVolumeAlgo(timestamp, connection):
+
+    result = connection.execute("""SELECT SUM("volume") FROM  {tn} WHERE asset_id = -1 and "timestamp" BETWEEN {timestamp}-86400 AND {timestamp};""".format(
+        tn=assets_metrics_table_name, timestamp=timestamp))  # get volume based on timestamp
+
+    volume_algo = result.first()
+    
+
+    if volume_algo == None:
+        return 0
+    else:
+        if volume_algo[0]:
+            return float(volume_algo[0])
+        else:
+            return 0
+# ---------------- PRICE INDEXER FUNCTIONS
+
+
+def startPriceSQL():
+    global engine
+
+    engine = sqlalchemy.create_engine("postgres+psycopg2://{user}:{pw}@{host}:{port}/{db}"
+                                      .format(user=settings["database"]["user"],
+                                              pw=settings["database"]["password"],
+                                              db=settings["database"]["databaseName"],
+                                              host=settings["database"]["host"],
+                                              port=settings["database"]["port"]
+                                              ))
+
+    # dropPriceTable(engine)
+
+    createTablePrice(engine, price_table_name)
+
+
+def dropPriceTable(engine):
     connection = engine.connect()
-    result = connection.execute("""SELECT "volume_algo" FROM  {tn} WHERE "timestamp" = {timestamp};""".format(tn=transaction_metrics_table_name, timestamp = timestamp))  # get volume based on timestamp
-    volume_algo = result.first()[0]
+    connection.execute("""DROP TABLE IF EXISTS {price_table_name};""".format(
+        price_table_name=price_table_name))
     connection.close()
 
-    if volume_algo == None: 
-        return 1
-    else:
-        return float(volume_algo)
-        
+
+def createTablePrice(engine, table_name):
+    connection = engine.connect()
+    connection.execute("""CREATE TABLE IF NOT EXISTS {table_name} (
+			                    timestamp bigint NOT NULL PRIMARY KEY,
+                                "pair" VARCHAR,
+                                "low" numeric,
+                                "high" numeric,
+                                "open" numeric,
+                                "close" numeric,
+                                "volume" numeric
+                                );
+
+                            CREATE INDEX IF NOT EXISTS timestamp_index_stats_economics ON {table_name} ("timestamp");""".format(table_name=table_name))
+
+    connection.close()

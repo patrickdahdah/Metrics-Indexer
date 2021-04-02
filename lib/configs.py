@@ -1,7 +1,6 @@
 import json
 import os
 import argparse
-from numpy.core.getlimits import MachArLike
 import pandas as pd
 
 balances_table_name = "stats_balances"
@@ -10,6 +9,10 @@ balances_metrics_table_name = "stats_balances_metrics"
 transaction_metrics_table_name = "stats_transaction_metrics"
 exceptional_addresses_table_name = "stats_exceptional_addresses"
 exchanges_table_name = "stats_exchanges_addresses"
+price_table_name = "stats_price"
+misc_metrics_table_name = "stats_misc_metrics"
+assets_metrics_table_name = "stats_assets_metrics"
+
 
 def getSettings():
     global settings
@@ -20,7 +23,7 @@ def getSettings():
         # Initialize parser 
         parser = argparse.ArgumentParser() 
         # Adding optional argument 
-        parser.add_argument("-s", "--Settings", help = "Add settings path. example: $ python3 -s /home/blabla/settingsT.json") 
+        parser.add_argument("-s", "--Settings", help = "Add settings path. example: $ python3 -s /home/blabla/settings.json") 
         # Read arguments from command line 
         args = parser.parse_args() 
 
@@ -41,7 +44,7 @@ def getSettings():
 
         else:
             basepath = os.path.dirname(__file__)
-            filepath = os.path.abspath(os.path.join(basepath, "..", "settingsT.json"))
+            filepath = os.path.abspath(os.path.join(basepath, "..", "settings.json"))
             with open(filepath) as f:
                 settings = json.load(f)
           

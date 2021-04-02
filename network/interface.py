@@ -7,6 +7,7 @@ import datetime
 import pandas as pd
 
 URL=settings["baseUrl"]
+priceUrl = settings["priceUrl"]
 DATE_PAST_PRICES = pd.to_datetime("2019-09-18", format = "%Y-%m-%d")
 CSVPRICE=pd.read_csv('data/price.csv') 
 CSVPRICE["timestamp"]=pd.to_datetime(CSVPRICE['timestamp'], format = "%m/%d/%Y")
@@ -15,7 +16,7 @@ def fetchGet(url: str):
     headers = {'Accept': 'application/json'}
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
-        raise Exception('The request generates an unexpected response  \
+        raise requests.exceptions.RequestException('The request generates an unexpected response  \
             Status code= %d' %(response.status_code) )
     return response
 
@@ -43,9 +44,23 @@ def getPrice(timestamp): #timestamp in YEAR-MM-DD in pandas datatime
         timestampYMD = pd.to_datetime(timestampYMD)
         return CSVPRICE.loc[CSVPRICE['timestamp'] == timestampYMD, 'price'].item()
     else:
-        responsePrice = fetchGet("{url}/stats/algoprice/since/{since}/until/{until}?samples={samples}".format(url=URL,since=timestamp,until=timestamp+1,samples=1))
+        responsePrice = fetchGet("{url}/algo-usd/history?since={since}&until={until}".format(url=priceUrl,since=timestamp-43200,until=timestamp))
         jsonPrice=responsePrice.json()
-        return jsonPrice[0]["price"]
+        pricesData = jsonPrice["history"]
+        if pricesData:
+            return pricesData[-1]["close"]
+        else:
+            raise requests.exceptions.RequestException('The request has no data  \
+            Status code= %d' %(responsePrice.status_code) ) 
+
+def getPriceRows(timestamp): #timestamp in YEAR-MM-DD in pandas datatime
+
+    responsePrice = fetchGet("{url}/algo-usd/history?since={since}&until={until}".format(url=priceUrl,since=timestamp,until=timestamp+86399))
+    jsonPrice=responsePrice.json()
+    pricesData = jsonPrice["history"]
+
+    return pricesData
+
 
 def timestampToString(t):
     return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(t))
@@ -137,11 +152,11 @@ def addRealizedCapColumn2(addrsDF, timestamp): #get the algo price at timestamp 
 
     return addrsDF
 
-def calculations(circulating_supply,realized_cap, price):
+def calculations(circulating_supply,realized_cap, price, connection):
 
     market_cap = round(circulating_supply * price, 2) # * last price
     realizedPrice = round(realized_cap / circulating_supply, 3)
-    STDDevMarketCap = sql.getSTDDevMarketCap(economics_table_name)
+    STDDevMarketCap = sql.getSTDDevMarketCap(economics_table_name, connection)
 
     if STDDevMarketCap != 0: #If results is not None or marketcap # of rows grater than 3 include MRV_Zscore
         mvrv_zscore = round((market_cap - realized_cap) / STDDevMarketCap , 3)
@@ -202,11 +217,12 @@ def calculationsMVRVdays(untilDate, transactionsDF, cs):
 
     return MVRV_Ratio30o , MVRV_Ratio30y , MVRV_Ratio60o , MVRV_Ratio60y
 
-def calculationsNVT(circulatingSupply, market_cap, timestamp):
-    volume_algo = sql.getVolumeAlgo(timestamp)
-    token_velocity = round( volume_algo / circulatingSupply, 3)
+def calculationsNVT(tradeable_supply, market_cap, timestamp, connection):
+    volume_algo = sql.get24hVolumeAlgo(timestamp,connection) / 1000000
+    token_velocity = round( volume_algo / tradeable_supply, 3)
     if volume_algo > 0:
-        nvt = round (market_cap/volume_algo, 3)
+        nvt = round (market_cap/ volume_algo, 3)
     else:
         nvt = 0
     return token_velocity, nvt
+    
