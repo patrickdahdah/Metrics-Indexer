@@ -2,9 +2,13 @@
 {
     "appName":"analytics-indexer",
     "baseUrl":"https://api.algoexplorer.io/v1",
+<<<<<<< HEAD
     "priceUrl" : "price.com",
     "urlSlack": "slack.com",
     "urlSlackP": "slack.com",
+=======
+    "urlSlack":"slack.com" ,
+>>>>>>> 6ccf39d88414f780fff6c7a94a5356113cdb7df2
     "database":{
         "user":"user",
         "password":"password",
@@ -13,4 +17,7 @@
         "databaseName":"databaseName"
     }
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 6ccf39d88414f780fff6c7a94a5356113cdb7df2
